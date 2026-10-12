@@ -281,7 +281,7 @@ export default function DocumentManager({
   });
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-x-clip">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
@@ -339,7 +339,7 @@ export default function DocumentManager({
           <p className="text-slate-600">No documents match your search.</p>
         </div>
       ) : (
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid min-w-0 max-w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filteredDocuments.map((document) => (
             <article
               key={document.id}
@@ -354,7 +354,7 @@ export default function DocumentManager({
                 }
                 if (selectionMode) toggleSelected(document.id);
               }}
-              className={`relative rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${
+              className={`relative min-w-0 max-w-full overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-800 ${
                 selectedIds.has(document.id) ? "ring-2 ring-violet-500 ring-offset-2" : ""
               }`}
             >

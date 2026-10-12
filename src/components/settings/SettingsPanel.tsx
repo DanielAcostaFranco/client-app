@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import ToastNotification from "@/components/ui/ToastNotification";
+import { vaultlyThemeEvent } from "@/components/providers/ThemeSync";
 
 type SettingsPanelProps = {
   userId: string;
@@ -54,6 +55,7 @@ export default function SettingsPanel({
     const nextValue = !isDarkMode;
     setIsDarkMode(nextValue);
     window.localStorage.setItem("vaultly-theme", nextValue ? "dark" : "light");
+    window.dispatchEvent(new Event(vaultlyThemeEvent));
   }
 
   async function saveName() {

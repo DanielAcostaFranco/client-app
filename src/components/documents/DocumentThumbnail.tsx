@@ -109,7 +109,7 @@ export default function DocumentThumbnail({
   return (
     <div
       ref={containerRef}
-      className={`${dimensions} overflow-hidden rounded-xl bg-slate-100`}
+      className={`${dimensions} min-w-0 max-w-full overflow-hidden rounded-xl bg-slate-100`}
     >
       {previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element

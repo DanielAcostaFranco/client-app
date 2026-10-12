@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -22,20 +22,6 @@ export default function ProfileMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [hasAvatarError, setHasAvatarError] = useState(false);
-  const [isDarkMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-
-    const savedTheme = window.localStorage.getItem("vaultly-theme");
-    return (
-      savedTheme === "dark" ||
-      (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)
-    );
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDarkMode);
-  }, [isDarkMode]);
-
   async function handleSignOut() {
     setIsSigningOut(true);
     const supabase = createClient();
@@ -51,7 +37,7 @@ export default function ProfileMenu({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         onClick={() => setIsOpen((open) => !open)}
-        className="flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white p-1.5 pr-3 text-left shadow-sm hover:bg-slate-50"
+        className="flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white p-1.5 pr-3 text-left shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
       >
         {avatarUrl && !hasAvatarError ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -70,11 +56,11 @@ export default function ProfileMenu({
             loading="eager"
           />
         ) : (
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700 dark:bg-slate-700 dark:text-violet-200">
             {name.charAt(0).toUpperCase()}
           </span>
         )}
-        <span className="hidden text-sm font-medium text-slate-700 sm:inline">
+        <span className="hidden text-sm font-medium text-slate-700 dark:text-slate-100 sm:inline">
           {name}
         </span>
         <span aria-hidden="true" className="text-xs text-slate-500 dark:text-slate-400">

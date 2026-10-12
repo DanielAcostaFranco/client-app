@@ -59,6 +59,19 @@ export default async function SiteHeader() {
         </Link>
 
         <div className="ml-auto flex min-w-0 items-center gap-2">
+          {user && (
+            <nav aria-label="Desktop navigation" className="mr-2 hidden items-center gap-1 sm:flex">
+              <Link href="/dashboard" className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-violet-300">
+                Dashboard
+              </Link>
+              <Link href="/documents" className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-violet-300">
+                My Documents
+              </Link>
+              <Link href="/favorites" className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-violet-300">
+                Favorites
+              </Link>
+            </nav>
+          )}
           {user && <GlobalSearch />}
           {user ? (
             <div className="hidden sm:block">
