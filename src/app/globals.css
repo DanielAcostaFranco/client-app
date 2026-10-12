@@ -1,8 +1,46 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer components {
+  .menu-action {
+    @apply block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-fade-in {
+  min-height: 100%;
+  background: #ffffff;
+  animation: page-fade-in 220ms ease-out;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8f7ff;
+  --foreground: #171334;
+  --brand-purple: #4b22d7;
+  --brand-purple-dark: #3516aa;
+  --brand-lilac: #a78bfa;
+  --brand-coral: #ff8a76;
 }
 
 @theme inline {
@@ -12,15 +50,95 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
+  min-width: 320px;
+  width: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "SF Pro Rounded", "Avenir Next Rounded", "Avenir Next", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bg-blue-600 {
+  background-color: var(--brand-purple) !important;
+}
+
+.hover\:bg-blue-700:hover {
+  background-color: var(--brand-purple-dark) !important;
+}
+
+.text-blue-600,
+.text-blue-700 {
+  color: var(--brand-purple) !important;
+}
+
+.border-blue-500,
+.focus\:border-blue-500:focus {
+  border-color: var(--brand-purple) !important;
+}
+
+.focus\:ring-blue-200:focus {
+  --tw-ring-color: color-mix(in srgb, var(--brand-lilac) 40%, transparent) !important;
+}
+
+html.dark {
+  --background: #110d2b;
+  --foreground: #f8fafc;
+}
+
+html.dark .page-fade-in {
+  background: #0f172a;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #0f172a;
+}
+
+html.dark .bg-slate-50 {
+  background-color: #1e293b;
+}
+
+html.dark .bg-white {
+  background-color: #1e293b;
+}
+
+html.dark .text-slate-900 {
+  color: #f8fafc;
+}
+
+html.dark .text-slate-700 {
+  color: #e2e8f0;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: #475569;
+}
+
+html.dark .border-slate-100 {
+  border-color: #334155;
+}
+
+html.dark input,
+html.dark textarea {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #94a3b8;
 }
