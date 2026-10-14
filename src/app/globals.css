@@ -59,6 +59,7 @@
 }
 
 :root {
+  background: #ffffff;
   --background: #f8f7ff;
   --foreground: #171334;
   --brand-purple: #4b22d7;
@@ -116,6 +117,7 @@ textarea {
 }
 
 html.dark {
+  background: #0f172a;
   --background: #110d2b;
   --foreground: #f8fafc;
 }
@@ -126,6 +128,28 @@ html.dark .page-fade-in {
 
 html.dark .site-brand {
   color: #ffffff !important;
+}
+
+/* Keep brand accents readable on dark surfaces throughout the app. */
+html.dark .text-violet-500,
+html.dark .text-violet-600 {
+  color: #c4b5fd !important;
+}
+
+html.dark .text-violet-700 {
+  color: #ddd6fe !important;
+}
+
+html.dark .text-violet-800 {
+  color: #ede9fe !important;
+}
+
+html.dark .text-blue-600 {
+  color: #c4b5fd !important;
+}
+
+html.dark .text-blue-700:not(.site-brand) {
+  color: #bfdbfe !important;
 }
 
 html.dark .bg-slate-100 {

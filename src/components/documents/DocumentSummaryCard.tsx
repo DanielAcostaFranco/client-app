@@ -1,17 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import type { DocumentRecord } from "@/types/documents";
-
-type Reminder = {
-  id: string;
-  scheduled_at: string | null;
-  amount: number | null;
-  unit: string | null;
-  reminder_message: string | null;
-  status: string;
-};
 
 function formatDate(value: string | null) {
   if (!value) return "Not set";
@@ -31,57 +20,33 @@ export default function DocumentSummaryCard({
   onEdit: () => void;
   onDownload: () => void;
 }) {
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    const loadReminders = async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("document_reminders")
-        .select("id, scheduled_at, amount, unit, reminder_message, status")
-        .eq("document_id", document.id)
-        .order("scheduled_at", { ascending: true });
-      if (active) setReminders((data ?? []) as Reminder[]);
-    };
-    void loadReminders();
-    return () => { active = false; };
-  }, [document.id]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6">
-      <section role="dialog" aria-modal="true" aria-labelledby="document-summary-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6" onClick={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="document-summary-title" onClick={(event) => event.stopPropagation()} className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Document summary</p>
-            <h2 id="document-summary-title" className="mt-1 break-words text-2xl font-bold text-slate-900">{document.file_name}</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">Document summary</p>
+            <h2 id="document-summary-title" className="mt-1 break-words text-xl font-bold text-slate-900 dark:text-white">{document.file_name}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close document summary" className="rounded-lg px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100">×</button>
+          <button type="button" onClick={onClose} aria-label="Close document summary" className="rounded-lg px-2 text-xl leading-none text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">×</button>
         </div>
 
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div><dt className="text-xs font-semibold uppercase text-slate-500">Category</dt><dd className="mt-1 text-slate-800">{document.category || "Other"}</dd></div>
-          <div><dt className="text-xs font-semibold uppercase text-slate-500">Added</dt><dd className="mt-1 text-slate-800">{formatDate(document.created_at)}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase text-slate-500">Expires</dt><dd className="mt-1 font-medium text-amber-700">{formatDate(document.expires_at)}</dd></div>
-        </dl>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-red-600 p-3 text-white shadow-sm sm:col-span-2"><dt className="text-[11px] font-bold uppercase tracking-wide text-red-100">Expires</dt><dd className="mt-1 text-base font-bold text-white">{formatDate(document.expires_at)}</dd></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"><dt className="text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">Category</dt><dd className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{document.category || "Other"}</dd></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"><dt className="text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">Added</dt><dd className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{formatDate(document.created_at)}</dd></div>
+          </dl>
 
-        {document.description && (
-          <div className="mt-5 rounded-xl bg-slate-50 p-4"><h3 className="font-semibold text-slate-900">Description</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{document.description}</p></div>
-        )}
-        {document.renewal_instructions && (
-          <div className="mt-4 rounded-xl bg-amber-50 p-4"><h3 className="font-semibold text-amber-900">Renewal instructions</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-900">{document.renewal_instructions}</p></div>
-        )}
-        {document.tags && document.tags.length > 0 && (
-          <div className="mt-4"><h3 className="text-sm font-semibold text-slate-900">Tags</h3><div className="mt-2 flex flex-wrap gap-2">{document.tags.map((tag) => <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{tag}</span>)}</div></div>
-        )}
-        {reminders.length > 0 && (
-          <div className="mt-5"><h3 className="font-semibold text-slate-900">Additional reminders</h3><div className="mt-2 space-y-2">{reminders.map((reminder) => <div key={reminder.id} className="rounded-lg border border-slate-200 p-3 text-sm"><p className="font-medium text-slate-800">{reminder.scheduled_at ? formatDate(reminder.scheduled_at) : `${reminder.amount ?? ""} ${reminder.unit ?? ""}`}</p>{reminder.reminder_message && <p className="mt-1 whitespace-pre-wrap text-slate-600">{reminder.reminder_message}</p>}</div>)}</div></div>
-        )}
+          {document.description && <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"><h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Description</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">{document.description}</p></div>}
+          {document.renewal_instructions && <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"><h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Renewal instructions</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300">{document.renewal_instructions}</p></div>}
+          {document.tags && document.tags.length > 0 && <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800"><h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Tags</h3><div className="mt-2 flex flex-wrap gap-2">{document.tags.map((tag) => <span key={tag} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:ring-slate-600">{tag}</span>)}</div></div>}
+        </div>
 
-        <div className="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-5">
-          <button type="button" onClick={onEdit} className="rounded-lg border border-violet-300 px-4 py-2 font-medium text-violet-700 hover:bg-violet-50">Edit details</button>
-          <button type="button" onClick={onDownload} className="rounded-lg border border-blue-300 px-4 py-2 font-medium text-blue-700 hover:bg-blue-50">Download file</button>
-          <button type="button" onClick={onOpenFile} className="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-700">Open file</button>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3 dark:border-slate-700 dark:bg-slate-900 sm:px-6">
+          <button type="button" onClick={onEdit} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700">Edit details</button>
+          <button type="button" onClick={onDownload} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700">Download file</button>
+          <button type="button" onClick={onOpenFile} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700">Open file</button>
         </div>
       </section>
     </div>

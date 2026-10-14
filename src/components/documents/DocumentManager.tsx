@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -75,6 +75,8 @@ export default function DocumentManager({
   const [dismissedSummaryRequest, setDismissedSummaryRequest] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewMenuOpen, setPreviewMenuOpen] = useState(false);
+  const [shareMenuDocumentId, setShareMenuDocumentId] = useState<string | null>(null);
   const [editingDocument, setEditingDocument] = useState<DocumentRecord | null>(null);
   const [editName, setEditName] = useState("");
   const [editTags, setEditTags] = useState("");
@@ -90,6 +92,34 @@ export default function DocumentManager({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreNextCardClick = useRef(false);
+  const openMenuRef = useRef<HTMLDivElement>(null);
+  const previewMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (openMenuRef.current && !openMenuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [openMenuId]);
+
+  useEffect(() => {
+    if (!previewMenuOpen) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (previewMenuRef.current && !previewMenuRef.current.contains(event.target as Node)) {
+        setPreviewMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [previewMenuOpen]);
 
   const requestedSummaryId = searchParams.get("document");
   const summaryRequest = requestedSummaryId
@@ -115,6 +145,8 @@ export default function DocumentManager({
 
   async function handleOpen(document: DocumentRecord) {
     setOpenMenuId(null);
+    setPreviewMenuOpen(false);
+    setShareMenuDocumentId(null);
     setErrorMessage(null);
     setPreviewingDocument(document);
     setPreviewUrl(null);
@@ -138,17 +170,63 @@ export default function DocumentManager({
     link.click();
   }
 
-  async function handleShare(document: DocumentRecord) {
+  async function handleShareFile(document: DocumentRecord) {
     setOpenMenuId(null);
+    setShareMenuDocumentId(null);
+    setErrorMessage(null);
+    const url = await createDocumentUrl(document, 3600);
+    if (!url) return;
+
+    try {
+      if (navigator.share) {
+        let sharedFile: File | null = null;
+
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const blob = await response.blob();
+            sharedFile = new File([blob], document.file_name, {
+              type: blob.type || document.file_type || "application/octet-stream",
+            });
+          }
+        } catch {
+          // Sharing the signed link still works if the browser blocks fetching the file.
+        }
+
+        const shareData = {
+          title: document.file_name,
+          text: `Vaultly document: ${document.file_name}`,
+          url,
+        };
+
+        if (sharedFile && (!navigator.canShare || navigator.canShare({ files: [sharedFile] }))) {
+          await navigator.share({ ...shareData, files: [sharedFile] });
+        } else {
+          await navigator.share(shareData);
+        }
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      setMessage("Share link copied. It will expire in one hour.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setErrorMessage("Could not share this document. Please try again.");
+    }
+  }
+
+  async function handleCopyLink(document: DocumentRecord) {
+    setOpenMenuId(null);
+    setShareMenuDocumentId(null);
     setErrorMessage(null);
     const url = await createDocumentUrl(document, 3600);
     if (!url) return;
 
     try {
       await navigator.clipboard.writeText(url);
-      setMessage("Share link copied. It will expire in one hour.");
+      setMessage("Download link copied. It will expire in one hour.");
     } catch {
-      setErrorMessage("Could not copy the share link. Please try again.");
+      setErrorMessage("Could not copy the download link. Please try again.");
     }
   }
 
@@ -493,7 +571,7 @@ export default function DocumentManager({
                   {document.is_favorite ? "★" : "☆"}
                 </button>
 
-                <div className="absolute right-2 top-2">
+                <div ref={openMenuId === document.id ? openMenuRef : undefined} className="absolute right-2 top-2">
                   <button
                     type="button"
                     aria-label={`Actions for ${document.file_name}`}
@@ -519,9 +597,19 @@ export default function DocumentManager({
                       <button type="button" onClick={(event) => { event.stopPropagation(); void handleDownload(document); }} className="menu-action">
                         Download
                       </button>
-                      <button type="button" onClick={(event) => { event.stopPropagation(); void handleShare(document); }} className="menu-action">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setShareMenuDocumentId(shareMenuDocumentId === document.id ? null : document.id); }} className="menu-action">
                         Share
                       </button>
+                      {shareMenuDocumentId === document.id && (
+                        <div className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-700">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); void handleShareFile(document); }} className="menu-action text-xs">
+                            Share file
+                          </button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); void handleCopyLink(document); }} className="menu-action text-xs">
+                            Copy download link
+                          </button>
+                        </div>
+                      )}
                       <button type="button" onClick={(event) => { event.stopPropagation(); void handleDelete(document); }} className="menu-action text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">
                         Delete
                       </button>
@@ -534,32 +622,32 @@ export default function DocumentManager({
                 {document.file_name}
               </h3>
               {document.category && (
-                <span className="mt-2 inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-200">
+                <span className="mt-2 inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-transparent dark:px-0 dark:text-slate-200">
                   {document.category}
                 </span>
               )}
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                 {formatFileSize(document.file_size)} · {formatDate(document.created_at)}
               </p>
               {document.description && (
-                <p className="mt-3 line-clamp-2 text-sm text-slate-600">{document.description}</p>
+                <p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{document.description}</p>
               )}
               {document.renewal_instructions && (
-                <p className="mt-3 line-clamp-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <p className="mt-3 line-clamp-2 text-sm text-amber-800 dark:text-slate-300">
                   Renewal instructions: {document.renewal_instructions}
                 </p>
               )}
               {document.tags && document.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1">
                   {document.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                    <span key={tag} className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-transparent dark:px-0 dark:text-slate-300">
                       {tag}
                     </span>
                   ))}
                 </div>
               )}
               {document.expires_at && (
-                <p className="mt-4 text-xs font-medium text-amber-700">
+                <p className="mt-4 text-xs font-medium text-amber-700 dark:text-slate-300">
                   Expires {formatExpiration(document.expires_at)}
                 </p>
               )}
@@ -618,8 +706,16 @@ export default function DocumentManager({
       )}
 
       {previewingDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-6 sm:px-8">
-          <div className="flex h-full max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-6 sm:px-8"
+          onClick={() => {
+            setPreviewingDocument(null);
+            setPreviewUrl(null);
+            setPreviewMenuOpen(false);
+            setShareMenuDocumentId(null);
+          }}
+        >
+          <div onClick={(event) => event.stopPropagation()} className="flex h-[66svh] max-h-[66svh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <h2 className="truncate font-semibold text-slate-900">
@@ -627,17 +723,58 @@ export default function DocumentManager({
                 </h2>
                 <p className="text-xs text-slate-500">Preview link expires in 5 minutes.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewingDocument(null);
-                  setPreviewUrl(null);
-                }}
-                aria-label="Close preview"
-                className="rounded-lg px-3 py-2 text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-              >
-                ×
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <div ref={previewMenuRef} className="relative">
+                  <button
+                    type="button"
+                    aria-label="Preview actions"
+                    aria-expanded={previewMenuOpen}
+                    onClick={() => setPreviewMenuOpen((open) => !open)}
+                    className="rounded-lg px-3 py-2 text-xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  >
+                    ⋮
+                  </button>
+                  {previewMenuOpen && (
+                    <div className="absolute right-0 top-11 z-10 w-40 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                      <button type="button" onClick={() => { setPreviewMenuOpen(false); setPreviewingDocument(null); setPreviewUrl(null); openEdit(previewingDocument); }} className="menu-action">
+                        Edit details
+                      </button>
+                      <button type="button" onClick={() => void handleDownload(previewingDocument)} className="menu-action">
+                        Download file
+                      </button>
+                      <button type="button" onClick={() => setShareMenuDocumentId(shareMenuDocumentId === previewingDocument.id ? null : previewingDocument.id)} className="menu-action">
+                        Share
+                      </button>
+                      {shareMenuDocumentId === previewingDocument.id && (
+                        <div className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-700">
+                          <button type="button" onClick={() => void handleShareFile(previewingDocument)} className="menu-action text-xs">
+                            Share file
+                          </button>
+                          <button type="button" onClick={() => void handleCopyLink(previewingDocument)} className="menu-action text-xs">
+                            Copy download link
+                          </button>
+                        </div>
+                      )}
+                      <button type="button" onClick={() => { setPreviewMenuOpen(false); setPreviewingDocument(null); setPreviewUrl(null); void handleDelete(previewingDocument); }} className="menu-action text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40">
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewingDocument(null);
+                    setPreviewUrl(null);
+                    setPreviewMenuOpen(false);
+                    setShareMenuDocumentId(null);
+                  }}
+                  aria-label="Close preview"
+                  className="rounded-lg px-3 py-2 text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 overflow-hidden bg-slate-100 p-4 sm:p-6">
@@ -653,7 +790,7 @@ export default function DocumentManager({
                   src={previewUrl}
                   title={`Preview of ${previewingDocument.file_name}`}
                   loading="lazy"
-                  className="h-full min-h-[60vh] w-full rounded-lg border border-slate-200 bg-white"
+                  className="h-full w-full rounded-lg border border-slate-200 bg-white"
                 />
               ) : previewUrl && previewingDocument.file_type?.startsWith("image/") ? (
                 <div className="no-scrollbar flex h-full items-center justify-center overflow-hidden">

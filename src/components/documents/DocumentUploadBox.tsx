@@ -315,8 +315,8 @@ export default function DocumentUploadBox({
             onDrop={handleDrop}
             className={`mt-5 hidden cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 sm:block ${
               isDragging
-                ? "border-blue-500 bg-blue-50"
-                : "border-slate-300 hover:border-blue-400 hover:bg-slate-50"
+                ? "border-blue-500 bg-blue-50 dark:bg-slate-800"
+                : "border-slate-300 hover:border-blue-400 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
             }`}
           >
             <div className="text-4xl" aria-hidden="true">↑</div>
@@ -428,7 +428,7 @@ export default function DocumentUploadBox({
             </label>
 
             {expiresAt && (
-              <section className="mt-5 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+              <section className="mt-5 rounded-xl border border-violet-100 bg-violet-50/60 p-4 dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-slate-800">Extra reminders (optional)</h3>

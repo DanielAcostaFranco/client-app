@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -19,6 +19,20 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openAttempt, setOpenAttempt] = useState(0);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [isOpen]);
 
   const loadNotifications = useCallback(async () => {
     const supabase = createClient();
@@ -99,7 +113,7 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative">
+    <div ref={notificationPanelRef} className="relative">
       <button
         type="button"
         aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}

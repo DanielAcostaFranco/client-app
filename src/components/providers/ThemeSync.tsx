@@ -10,6 +10,7 @@ function applySavedTheme() {
   const isDark = savedTheme ? savedTheme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
   document.documentElement.classList.toggle("dark", isDark);
   document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", isDark ? "#0f172a" : "#ffffff");
 }
 
 export default function ThemeSync() {
