@@ -3,12 +3,14 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import DocumentUploadBox from "@/components/documents/DocumentUploadBox";
 import DocumentThumbnail from "@/components/documents/DocumentThumbnail";
 import ToastNotification from "@/components/ui/ToastNotification";
 import { documentsQueryKey, useDocumentsQuery } from "@/hooks/useDocumentsQuery";
 import type { DocumentRecord as SharedDocumentRecord } from "@/types/documents";
+import DocumentSummaryCard from "@/components/documents/DocumentSummaryCard";
 
 export type DocumentRecord = SharedDocumentRecord;
 
@@ -24,6 +26,19 @@ function formatDate(date: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(date));
+}
+
+function formatExpiration(date: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+}
+
+function toDateTimeInputValue(date: string) {
+  const value = new Date(date);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
 
 export default function DocumentManager({
@@ -46,6 +61,8 @@ export default function DocumentManager({
   viewMoreHref?: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const favoritesOnly = title === "Favorites";
   const listQueryKey = [...documentsQueryKey, favoritesOnly ? "favorites" : "all"] as const;
   const { data: documents = [] } = useDocumentsQuery({ favoritesOnly, initialDocuments });
@@ -55,6 +72,7 @@ export default function DocumentManager({
   const [currentTime] = useState(() => Date.now());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewingDocument, setPreviewingDocument] = useState<DocumentRecord | null>(null);
+  const [dismissedSummaryRequest, setDismissedSummaryRequest] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [editingDocument, setEditingDocument] = useState<DocumentRecord | null>(null);
@@ -72,6 +90,14 @@ export default function DocumentManager({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreNextCardClick = useRef(false);
+
+  const requestedSummaryId = searchParams.get("document");
+  const summaryRequest = requestedSummaryId
+    ? `${requestedSummaryId}:${searchParams.get("open") || ""}`
+    : null;
+  const summaryDocument = summaryRequest !== dismissedSummaryRequest && requestedSummaryId
+    ? documents.find((item) => item.id === requestedSummaryId) ?? null
+    : null;
 
   async function createDocumentUrl(document: DocumentRecord, expiresIn = 60) {
     const supabase = createClient();
@@ -190,7 +216,7 @@ export default function DocumentManager({
     setEditDescription(document.description || "");
     setEditRenewalInstructions(document.renewal_instructions || "");
     setEditCategory(document.category || "Other");
-    setEditExpiresAt(document.expires_at ? document.expires_at.slice(0, 10) : "");
+    setEditExpiresAt(document.expires_at ? toDateTimeInputValue(document.expires_at) : "");
     setErrorMessage(null);
   }
 
@@ -214,7 +240,7 @@ export default function DocumentManager({
         description: editDescription.trim() || null,
         renewal_instructions: editRenewalInstructions.trim() || null,
         category: editCategory.trim() || "Other",
-        expires_at: editExpiresAt || null,
+        expires_at: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
       })
       .eq("id", editingDocument.id)
       .select("id, file_name, storage_path, file_type, file_size, description, renewal_instructions, tags, category, is_favorite, expires_at, created_at")
@@ -534,7 +560,7 @@ export default function DocumentManager({
               )}
               {document.expires_at && (
                 <p className="mt-4 text-xs font-medium text-amber-700">
-                  Expires {formatDate(document.expires_at)}
+                  Expires {formatExpiration(document.expires_at)}
                 </p>
               )}
             </article>
@@ -574,7 +600,7 @@ export default function DocumentManager({
 
             <label className="mt-4 block text-sm font-medium text-slate-700">
               Expiration date
-              <input type="date" value={editExpiresAt} onChange={(event) => setEditExpiresAt(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+              <input type="datetime-local" value={editExpiresAt} onChange={(event) => setEditExpiresAt(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
             </label>
 
             {errorMessage && <p className="mt-4 text-sm text-red-600">{errorMessage}</p>}
@@ -660,6 +686,16 @@ export default function DocumentManager({
             </div>
           </div>
         </div>
+      )}
+
+      {summaryDocument && (
+        <DocumentSummaryCard
+          document={summaryDocument}
+          onClose={() => { setDismissedSummaryRequest(summaryRequest); router.replace("/documents"); }}
+          onEdit={() => { setDismissedSummaryRequest(summaryRequest); router.replace("/documents"); openEdit(summaryDocument); }}
+          onDownload={() => void handleDownload(summaryDocument)}
+          onOpenFile={() => { setDismissedSummaryRequest(summaryRequest); router.replace("/documents"); void handleOpen(summaryDocument); }}
+        />
       )}
 
       {documentToDelete && (

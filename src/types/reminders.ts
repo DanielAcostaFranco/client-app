@@ -14,6 +14,7 @@ export type ReminderDraft = {
   amount: number;
   unit: ReminderUnit;
   message: string;
+  notificationTime: string;
 };
 
 export const REMINDER_UNIT_LABELS: Record<ReminderUnit, string> = {

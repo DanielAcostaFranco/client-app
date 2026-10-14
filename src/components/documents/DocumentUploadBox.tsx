@@ -10,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import StatusModal from "@/components/ui/StatusModal";
-import { REMINDER_UNITS, REMINDER_UNIT_LABELS, type ReminderDraft, type ReminderUnit } from "@/types/reminders";
+import { getExactReminderAt } from "@/utils/exactReminder";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const DOCUMENT_CATEGORIES = [
@@ -60,9 +60,7 @@ export default function DocumentUploadBox({
   const [category, setCategory] = useState("Other");
   const [customCategory, setCustomCategory] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
-  const [reminders, setReminders] = useState<ReminderDraft[]>([
-    { amount: 30, unit: "days", message: "" },
-  ]);
+  const [reminders, setReminders] = useState<{ scheduledAt: string; message: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -93,7 +91,7 @@ export default function DocumentUploadBox({
     setCategory("Other");
     setCustomCategory("");
     setExpiresAt("");
-    setReminders([{ amount: 30, unit: "days", message: "" }]);
+    setReminders([]);
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -118,7 +116,7 @@ export default function DocumentUploadBox({
     setCategory("Other");
     setCustomCategory("");
     setExpiresAt("");
-    setReminders([{ amount: 30, unit: "days", message: "" }]);
+    setReminders([]);
     setErrorMessage(null);
   }
 
@@ -128,6 +126,21 @@ export default function DocumentUploadBox({
 
     setIsSaving(true);
     setErrorMessage(null);
+    const expiration = expiresAt ? new Date(expiresAt) : null;
+    if (expiration && (Number.isNaN(expiration.getTime()) || expiration.getTime() <= Date.now())) {
+      setErrorMessage("Choose an expiration date and time in the future.");
+      setIsSaving(false);
+      return;
+    }
+    if (expiration) {
+      for (const reminder of reminders) {
+        if (!getExactReminderAt(reminder.scheduledAt, expiration)) {
+          setErrorMessage("Choose a reminder date and time after now and before expiration.");
+          setIsSaving(false);
+          return;
+        }
+      }
+    }
     const supabase = createClient();
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -182,6 +195,9 @@ export default function DocumentUploadBox({
       return;
     }
 
+    const expirationTimestamp = expiration?.toISOString() || null;
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
     const { data: savedDocument, error: insertError } = await supabase
       .from("documents")
       .insert({
@@ -195,7 +211,8 @@ export default function DocumentUploadBox({
         tags: parsedTags,
         category: finalCategory,
         is_favorite: false,
-        expires_at: expiresAt || null,
+        expires_at: expirationTimestamp,
+        expiration_timezone: userTimezone,
       })
       .select("id, file_name, storage_path, file_type, file_size, description, renewal_instructions, tags, category, is_favorite, expires_at, created_at")
       .single();
@@ -209,16 +226,14 @@ export default function DocumentUploadBox({
       return;
     }
 
-    if (expiresAt) {
-      const reminderRows = reminders
-        .filter((reminder) => Number.isFinite(reminder.amount) && reminder.amount > 0)
-        .map((reminder) => ({
+    if (expiresAt && reminders.length > 0) {
+      const reminderRows = reminders.map((reminder) => ({
           document_id: savedDocument.id,
           user_id: userData.user.id,
-          amount: reminder.amount,
-          unit: reminder.unit,
-          days_before: reminder.unit === "days" ? reminder.amount : null,
+          scheduled_at: new Date(reminder.scheduledAt).toISOString(),
           reminder_message: reminder.message.trim() || null,
+          status: "active",
+          timezone: userTimezone,
         }));
 
       const { error: reminderError } = await supabase
@@ -230,7 +245,9 @@ export default function DocumentUploadBox({
         await supabase.storage.from("documents").remove([storagePath]);
         setStatusModal({
           title: "Reminder could not be saved",
-          message: "Run the reminder table SQL in Supabase, then try uploading again.",
+          message: reminderError?.message
+            ? `Supabase error: ${reminderError.message}`
+            : "The reminder table could not be updated. Run the reminder migration in Supabase, then try uploading again.",
           variant: "error",
         });
         setIsSaving(false);
@@ -395,30 +412,31 @@ export default function DocumentUploadBox({
                 className="mt-2 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
               />
               <span className="mt-1 block text-xs font-normal text-slate-500">
-                These instructions will appear with expiration reminders.
+                These instructions will appear in your expiration notification and extra reminders.
               </span>
             </label>
 
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Expiration date
+              Expiration date and time
               <input
-                type="date"
+                type="datetime-local"
                 value={expiresAt}
                 onChange={(event) => setExpiresAt(event.target.value)}
                 className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
+              <span className="mt-1 block text-xs font-normal text-slate-500">You will automatically get an in-app notification when the document expires.</span>
             </label>
 
             {expiresAt && (
               <section className="mt-5 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold text-slate-800">Reminders</h3>
-                    <p className="mt-1 text-xs text-slate-600">Add one or more reminders before this file expires.</p>
+                    <h3 className="font-semibold text-slate-800">Extra reminders (optional)</h3>
+                    <p className="mt-1 text-xs text-slate-600">Choose the exact date and time for each additional notification.</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setReminders((current) => [...current, { amount: 7, unit: "days", message: "" }])}
+                    onClick={() => setReminders((current) => [...current, { scheduledAt: "", message: "" }])}
                     className="rounded-full bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-700"
                   >
                     Add reminder
@@ -427,39 +445,23 @@ export default function DocumentUploadBox({
 
                 <div className="mt-4 space-y-3">
                   {reminders.map((reminder, index) => (
-                    <div key={`${index}-${reminder.unit}`} className="rounded-lg bg-white p-3 shadow-sm">
-                      <div className="flex gap-2">
+                    <div key={index} className="rounded-lg bg-white p-3 shadow-sm">
+                      <div className="flex items-end gap-2">
                         <label className="flex-1 text-xs font-medium text-slate-600">
-                          Number
+                          Notification date and time
                           <input
-                            type="number"
-                            min="1"
-                            max="9999"
-                            value={reminder.amount}
-                            onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value) } : item))}
+                            type="datetime-local"
+                            value={reminder.scheduledAt}
+                            onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, scheduledAt: event.target.value } : item))}
                             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
                           />
                         </label>
-                        <label className="flex-1 text-xs font-medium text-slate-600">
-                          Unit
-                          <select
-                            value={reminder.unit}
-                            onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit: event.target.value as ReminderUnit } : item))}
-                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                          >
-                            {REMINDER_UNITS.map((unit) => <option key={unit} value={unit}>{REMINDER_UNIT_LABELS[unit]}</option>)}
-                          </select>
-                        </label>
-                        {reminders.length > 1 && (
-                          <button
-                            type="button"
-                            aria-label={`Remove reminder ${index + 1}`}
-                            onClick={() => setReminders((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                            className="mt-5 self-start rounded-lg px-2 py-2 text-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                          >
-                            ×
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          aria-label={`Remove reminder ${index + 1}`}
+                          onClick={() => setReminders((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                          className="rounded-lg px-2 py-2 text-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        >×</button>
                       </div>
                       <label className="mt-3 block text-xs font-medium text-slate-600">
                         Reminder message (optional)
