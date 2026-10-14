@@ -1,6 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/utils/supabase/server";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+
+  if (data.user) {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="min-h-[calc(100svh-65px)] w-full bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
       <section className="mx-auto w-full max-w-5xl">
