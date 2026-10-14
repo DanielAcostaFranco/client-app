@@ -13,7 +13,7 @@ async function fetchDocuments(favoritesOnly: boolean) {
 
   let query = supabase
     .from("documents")
-    .select("id, file_name, storage_path, file_type, file_size, description, tags, category, is_favorite, expires_at, created_at")
+    .select("id, file_name, storage_path, file_type, file_size, description, renewal_instructions, tags, category, is_favorite, expires_at, created_at")
     .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false });
 

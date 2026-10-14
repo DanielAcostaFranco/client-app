@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import DocumentUploadBox from "@/components/documents/DocumentUploadBox";
 import DocumentThumbnail from "@/components/documents/DocumentThumbnail";
@@ -30,17 +31,28 @@ export default function DocumentManager({
   title = "My Documents",
   initialSearchQuery = "",
   showUpload = true,
+  showSearch = true,
+  showFilters = true,
+  maxDocuments,
+  viewMoreHref,
 }: {
   initialDocuments: DocumentRecord[];
   title?: string;
   initialSearchQuery?: string;
   showUpload?: boolean;
+  showSearch?: boolean;
+  showFilters?: boolean;
+  maxDocuments?: number;
+  viewMoreHref?: string;
 }) {
   const queryClient = useQueryClient();
   const favoritesOnly = title === "Favorites";
   const listQueryKey = [...documentsQueryKey, favoritesOnly ? "favorites" : "all"] as const;
   const { data: documents = [] } = useDocumentsQuery({ favoritesOnly, initialDocuments });
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "document" | "other">("all");
+  const [dateAddedFilter, setDateAddedFilter] = useState<"all" | "7" | "30" | "365">("all");
+  const [currentTime] = useState(() => Date.now());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewingDocument, setPreviewingDocument] = useState<DocumentRecord | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -49,6 +61,7 @@ export default function DocumentManager({
   const [editName, setEditName] = useState("");
   const [editTags, setEditTags] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editRenewalInstructions, setEditRenewalInstructions] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editExpiresAt, setEditExpiresAt] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -175,6 +188,7 @@ export default function DocumentManager({
     setEditName(document.file_name);
     setEditTags((document.tags || []).join(", "));
     setEditDescription(document.description || "");
+    setEditRenewalInstructions(document.renewal_instructions || "");
     setEditCategory(document.category || "Other");
     setEditExpiresAt(document.expires_at ? document.expires_at.slice(0, 10) : "");
     setErrorMessage(null);
@@ -198,11 +212,12 @@ export default function DocumentManager({
         file_name: editName.trim(),
         tags: parsedTags,
         description: editDescription.trim() || null,
+        renewal_instructions: editRenewalInstructions.trim() || null,
         category: editCategory.trim() || "Other",
         expires_at: editExpiresAt || null,
       })
       .eq("id", editingDocument.id)
-      .select("id, file_name, storage_path, file_type, file_size, description, tags, category, is_favorite, expires_at, created_at")
+      .select("id, file_name, storage_path, file_type, file_size, description, renewal_instructions, tags, category, is_favorite, expires_at, created_at")
       .single();
 
     if (error || !updatedDocument) {
@@ -270,15 +285,41 @@ export default function DocumentManager({
 
   const filteredDocuments = documents.filter((document) => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-
-    return [
+    const matchesSearch = !query || [
       document.file_name,
       document.description || "",
       document.category || "",
       ...(document.tags || []),
     ].some((value) => value.toLowerCase().includes(query));
+
+    if (!matchesSearch) return false;
+
+    const fileName = document.file_name.toLowerCase();
+    const fileType = document.file_type?.toLowerCase() || "";
+    const isImage = fileType.startsWith("image/");
+    const isVideo = fileType.startsWith("video/");
+    const isDocument = fileType === "application/pdf" ||
+      fileType.startsWith("text/") ||
+      /\.(pdf|doc|docx|txt|xls|xlsx|ppt|pptx)$/i.test(fileName);
+    const matchesType = typeFilter === "all" ||
+      (typeFilter === "image" && isImage) ||
+      (typeFilter === "video" && isVideo) ||
+      (typeFilter === "document" && isDocument) ||
+      (typeFilter === "other" && !isImage && !isVideo && !isDocument);
+
+    if (!matchesType) return false;
+
+    if (dateAddedFilter !== "all") {
+      const days = Number(dateAddedFilter);
+      const cutoff = currentTime - days * 24 * 60 * 60 * 1000;
+      if (new Date(document.created_at).getTime() < cutoff) return false;
+    }
+
+    return true;
   });
+  const visibleDocuments = maxDocuments
+    ? filteredDocuments.slice(0, maxDocuments)
+    : filteredDocuments;
 
   return (
     <div className="min-w-0 max-w-full overflow-x-clip">
@@ -287,14 +328,21 @@ export default function DocumentManager({
           <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
           <p className="mt-1 hidden text-xs text-slate-500 sm:block">Hold a card to select multiple documents.</p>
         </div>
-        {showUpload && (
-          <DocumentUploadBox
-            compact
-            onUploaded={(document) => {
-              queryClient.setQueryData<DocumentRecord[]>([...documentsQueryKey, "all"], (current = []) => [document as DocumentRecord, ...current]);
-            }}
-          />
-        )}
+        <div className="flex items-center gap-4">
+          {viewMoreHref && (
+            <Link href={viewMoreHref} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+              View more
+            </Link>
+          )}
+          {showUpload && (
+            <DocumentUploadBox
+              compact
+              onUploaded={(document) => {
+                queryClient.setQueryData<DocumentRecord[]>([...documentsQueryKey, "all"], (current = []) => [document as DocumentRecord, ...current]);
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {selectionMode && (
@@ -318,29 +366,69 @@ export default function DocumentManager({
         </div>
       )}
 
-      <div className="mt-5">
-        <label htmlFor="document-search" className="sr-only">Search documents</label>
-        <input
-          id="document-search"
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search documents, descriptions, or tags..."
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-        />
-      </div>
+      {showSearch && (
+        <div className="mt-5">
+          <label htmlFor="document-search" className="sr-only">Search documents</label>
+          <input
+            id="document-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search documents, descriptions, or tags..."
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          />
+        </div>
+      )}
+
+      {showFilters && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-sm font-medium text-slate-600">Quick filters:</span>
+          {([
+            ["all", "All"],
+            ["image", "Images"],
+            ["video", "Videos"],
+            ["document", "Documents"],
+            ["other", "Other"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTypeFilter(value)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                typeFilter === value
+                  ? "bg-violet-600 text-white"
+                  : "bg-white text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <label className="sr-only" htmlFor="date-added-filter">Filter by date added</label>
+          <select
+            id="date-added-filter"
+            value={dateAddedFilter}
+            onChange={(event) => setDateAddedFilter(event.target.value as typeof dateAddedFilter)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+          >
+            <option value="all">Any date added</option>
+            <option value="7">Added in the last 7 days</option>
+            <option value="30">Added in the last 30 days</option>
+            <option value="365">Added in the last year</option>
+          </select>
+        </div>
+      )}
 
       {documents.length === 0 ? (
         <div className="mt-8 rounded-2xl bg-white p-8 text-center shadow-sm">
           <p className="text-slate-600">You have not uploaded any documents yet.</p>
         </div>
-      ) : filteredDocuments.length === 0 ? (
+      ) : visibleDocuments.length === 0 ? (
         <div className="mt-8 rounded-2xl bg-white p-8 text-center shadow-sm">
           <p className="text-slate-600">No documents match your search.</p>
         </div>
       ) : (
         <div className="mt-8 grid min-w-0 max-w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredDocuments.map((document) => (
+          {visibleDocuments.map((document) => (
             <article
               key={document.id}
               onPointerDown={() => startLongPress(document.id)}
@@ -353,8 +441,9 @@ export default function DocumentManager({
                   return;
                 }
                 if (selectionMode) toggleSelected(document.id);
+                else void handleOpen(document);
               }}
-              className={`relative min-w-0 max-w-full overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-800 ${
+              className={`relative min-w-0 max-w-full cursor-pointer overflow-hidden rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-slate-800 ${
                 selectedIds.has(document.id) ? "ring-2 ring-violet-500 ring-offset-2" : ""
               }`}
             >
@@ -429,6 +518,11 @@ export default function DocumentManager({
               {document.description && (
                 <p className="mt-3 line-clamp-2 text-sm text-slate-600">{document.description}</p>
               )}
+              {document.renewal_instructions && (
+                <p className="mt-3 line-clamp-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Renewal instructions: {document.renewal_instructions}
+                </p>
+              )}
               {document.tags && document.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1">
                   {document.tags.slice(0, 3).map((tag) => (
@@ -471,6 +565,11 @@ export default function DocumentManager({
             <label className="mt-4 block text-sm font-medium text-slate-700">
               Description
               <textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+            </label>
+
+            <label className="mt-4 block text-sm font-medium text-slate-700">
+              Renewal instructions
+              <textarea value={editRenewalInstructions} onChange={(event) => setEditRenewalInstructions(event.target.value)} rows={4} placeholder="Where to renew, what to bring, or what steps to follow" className="mt-2 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200" />
             </label>
 
             <label className="mt-4 block text-sm font-medium text-slate-700">

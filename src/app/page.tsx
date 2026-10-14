@@ -11,45 +11,38 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-[calc(100svh-65px)] w-full bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
-      <section className="mx-auto w-full max-w-5xl">
-        <div className="mb-8 flex items-center gap-4 sm:mb-10">
-          {/* This intro video is intentionally mobile-only. */}
-          <video
-            className="h-20 w-20 shrink-0 rounded-3xl object-cover sm:hidden"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster="/brand/vaultly-logo-unlocked.png"
-            aria-label="Vaultly intro animation"
+    <main className="min-h-[calc(100svh-65px)] w-full overflow-hidden bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
+      <section className="mx-auto grid w-full max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_0.95fr] md:gap-8 lg:gap-16">
+        <div>
+
+
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">
+            Store, organize, and stay on top of every important file.
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+            Keep your documents secure, sort them into categories, find what you
+            need quickly, and get timely reminders before important files expire.
+          </p>
+
+          <Link
+            href="/auth/sign-in"
+            className="mt-8 inline-block rounded-lg bg-blue-600 px-5 py-3 font-medium text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-blue-700"
           >
-            <source src="/brand/vaultly-intro.mp4" type="video/mp4" />
-          </video>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">
-              Vaultly
-            </p>
-            <p className="mt-1 text-sm text-slate-500">Your private space for important documents.</p>
-          </div>
+            Get Started
+          </Link>
         </div>
 
-        <h1 className="text-4xl font-bold text-slate-900">
-          Your important information, organized and secure.
-        </h1>
-
-        <p className="mt-4 max-w-2xl text-lg text-slate-600">
-          Store your documents, find what you need, and receive reminders before
-          they expire.
-        </p>
-
-        <Link
-          href="/auth/sign-in"
-          className="mt-8 inline-block rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
-        >
-          Get Started
-        </Link>
+        <div className="relative mx-auto flex w-full max-w-md items-center justify-center py-4 md:py-10">
+          <div className="absolute h-52 w-52 rounded-full bg-violet-200/70 blur-3xl sm:h-64 sm:w-64" />
+          {/* Decorative folders illustration with a gentle floating animation. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/floating-folders-alert.png"
+            alt="Floating folders with an alert reminder"
+            className="hero-float relative w-[72%] max-w-[360px] drop-shadow-2xl"
+          />
+        </div>
       </section>
     </main>
   );

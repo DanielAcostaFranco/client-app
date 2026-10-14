@@ -5,6 +5,7 @@ export type DocumentRecord = {
   file_type: string | null;
   file_size: number | null;
   description?: string | null;
+  renewal_instructions?: string | null;
   tags?: string[];
   category?: string | null;
   is_favorite?: boolean;

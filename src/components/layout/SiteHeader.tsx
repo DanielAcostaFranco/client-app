@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import ProfileMenu from "@/components/layout/ProfileMenu";
 import MobileTabBar from "@/components/layout/MobileTabBar";
 import GlobalSearch from "@/components/layout/GlobalSearch";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default async function SiteHeader() {
   const supabase = await createClient();
@@ -73,6 +74,7 @@ export default async function SiteHeader() {
             </nav>
           )}
           {user && <GlobalSearch />}
+          {user && <NotificationBell />}
           {user ? (
             <div className="hidden sm:block">
               <ProfileMenu name={name} email={email} avatarUrl={avatarUrl} />

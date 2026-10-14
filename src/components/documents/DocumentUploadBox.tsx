@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import StatusModal from "@/components/ui/StatusModal";
+import { REMINDER_UNITS, REMINDER_UNIT_LABELS, type ReminderDraft, type ReminderUnit } from "@/types/reminders";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const DOCUMENT_CATEGORIES = [
@@ -32,6 +33,7 @@ type UploadedDocument = {
   file_type: string | null;
   file_size: number | null;
   description: string | null;
+  renewal_instructions: string | null;
   tags: string[];
   category: string;
   is_favorite: boolean;
@@ -54,10 +56,13 @@ export default function DocumentUploadBox({
   const [documentName, setDocumentName] = useState("");
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
+  const [renewalInstructions, setRenewalInstructions] = useState("");
   const [category, setCategory] = useState("Other");
   const [customCategory, setCustomCategory] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
-  const [reminderDaysBefore, setReminderDaysBefore] = useState("30");
+  const [reminders, setReminders] = useState<ReminderDraft[]>([
+    { amount: 30, unit: "days", message: "" },
+  ]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,10 +89,11 @@ export default function DocumentUploadBox({
     setDocumentName(file.name);
     setTags("");
     setDescription("");
+    setRenewalInstructions("");
     setCategory("Other");
     setCustomCategory("");
     setExpiresAt("");
-    setReminderDaysBefore("30");
+    setReminders([{ amount: 30, unit: "days", message: "" }]);
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -108,10 +114,11 @@ export default function DocumentUploadBox({
     setDocumentName("");
     setTags("");
     setDescription("");
+    setRenewalInstructions("");
     setCategory("Other");
     setCustomCategory("");
     setExpiresAt("");
-    setReminderDaysBefore("30");
+    setReminders([{ amount: 30, unit: "days", message: "" }]);
     setErrorMessage(null);
   }
 
@@ -184,12 +191,13 @@ export default function DocumentUploadBox({
         file_type: pendingFile.type || null,
         file_size: pendingFile.size,
         description: description.trim() || null,
+        renewal_instructions: renewalInstructions.trim() || null,
         tags: parsedTags,
         category: finalCategory,
         is_favorite: false,
         expires_at: expiresAt || null,
       })
-      .select("id, file_name, storage_path, file_type, file_size, description, tags, category, is_favorite, expires_at, created_at")
+      .select("id, file_name, storage_path, file_type, file_size, description, renewal_instructions, tags, category, is_favorite, expires_at, created_at")
       .single();
 
     if (insertError || !savedDocument) {
@@ -202,13 +210,20 @@ export default function DocumentUploadBox({
     }
 
     if (expiresAt) {
-      const { error: reminderError } = await supabase
-        .from("document_reminders")
-        .insert({
+      const reminderRows = reminders
+        .filter((reminder) => Number.isFinite(reminder.amount) && reminder.amount > 0)
+        .map((reminder) => ({
           document_id: savedDocument.id,
           user_id: userData.user.id,
-          days_before: Number(reminderDaysBefore),
-        });
+          amount: reminder.amount,
+          unit: reminder.unit,
+          days_before: reminder.unit === "days" ? reminder.amount : null,
+          reminder_message: reminder.message.trim() || null,
+        }));
+
+      const { error: reminderError } = await supabase
+        .from("document_reminders")
+        .insert(reminderRows);
 
       if (reminderError) {
         await supabase.from("documents").delete().eq("id", savedDocument.id);
@@ -371,6 +386,20 @@ export default function DocumentUploadBox({
             </label>
 
             <label className="mt-4 block text-sm font-medium text-slate-700">
+              Renewal instructions
+              <textarea
+                value={renewalInstructions}
+                onChange={(event) => setRenewalInstructions(event.target.value)}
+                rows={4}
+                placeholder="Example: Renew at example.com. Bring your current ID and proof of address."
+                className="mt-2 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-500">
+                These instructions will appear with expiration reminders.
+              </span>
+            </label>
+
+            <label className="mt-4 block text-sm font-medium text-slate-700">
               Expiration date
               <input
                 type="date"
@@ -381,23 +410,70 @@ export default function DocumentUploadBox({
             </label>
 
             {expiresAt && (
-              <label className="mt-4 block text-sm font-medium text-slate-700">
-                Notify me before expiration
-                <select
-                  value={reminderDaysBefore}
-                  onChange={(event) => setReminderDaysBefore(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="1">1 day before</option>
-                  <option value="7">7 days before</option>
-                  <option value="14">14 days before</option>
-                  <option value="30">30 days before</option>
-                  <option value="60">60 days before</option>
-                </select>
-                <span className="mt-1 block text-xs font-normal text-slate-500">
-                  You can add more reminders later.
-                </span>
-              </label>
+              <section className="mt-5 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">Reminders</h3>
+                    <p className="mt-1 text-xs text-slate-600">Add one or more reminders before this file expires.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReminders((current) => [...current, { amount: 7, unit: "days", message: "" }])}
+                    className="rounded-full bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-700"
+                  >
+                    Add reminder
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {reminders.map((reminder, index) => (
+                    <div key={`${index}-${reminder.unit}`} className="rounded-lg bg-white p-3 shadow-sm">
+                      <div className="flex gap-2">
+                        <label className="flex-1 text-xs font-medium text-slate-600">
+                          Number
+                          <input
+                            type="number"
+                            min="1"
+                            max="9999"
+                            value={reminder.amount}
+                            onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value) } : item))}
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                          />
+                        </label>
+                        <label className="flex-1 text-xs font-medium text-slate-600">
+                          Unit
+                          <select
+                            value={reminder.unit}
+                            onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, unit: event.target.value as ReminderUnit } : item))}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                          >
+                            {REMINDER_UNITS.map((unit) => <option key={unit} value={unit}>{REMINDER_UNIT_LABELS[unit]}</option>)}
+                          </select>
+                        </label>
+                        {reminders.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Remove reminder ${index + 1}`}
+                            onClick={() => setReminders((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                            className="mt-5 self-start rounded-lg px-2 py-2 text-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <label className="mt-3 block text-xs font-medium text-slate-600">
+                        Reminder message (optional)
+                        <input
+                          value={reminder.message}
+                          onChange={(event) => setReminders((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, message: event.target.value } : item))}
+                          placeholder="Start gathering renewal documents"
+                          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
 
             {errorMessage && <p className="mt-4 text-sm text-red-600">{errorMessage}</p>}
