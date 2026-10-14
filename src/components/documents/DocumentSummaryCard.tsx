@@ -74,6 +74,9 @@ export default function DocumentSummaryCard({
         {document.tags && document.tags.length > 0 && (
           <div className="mt-4"><h3 className="text-sm font-semibold text-slate-900">Tags</h3><div className="mt-2 flex flex-wrap gap-2">{document.tags.map((tag) => <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{tag}</span>)}</div></div>
         )}
+        {reminders.length > 0 && (
+          <div className="mt-5"><h3 className="font-semibold text-slate-900">Additional reminders</h3><div className="mt-2 space-y-2">{reminders.map((reminder) => <div key={reminder.id} className="rounded-lg border border-slate-200 p-3 text-sm"><p className="font-medium text-slate-800">{reminder.scheduled_at ? formatDate(reminder.scheduled_at) : `${reminder.amount ?? ""} ${reminder.unit ?? ""}`}</p>{reminder.reminder_message && <p className="mt-1 whitespace-pre-wrap text-slate-600">{reminder.reminder_message}</p>}</div>)}</div></div>
+        )}
 
         <div className="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-5">
           <button type="button" onClick={onEdit} className="rounded-lg border border-violet-300 px-4 py-2 font-medium text-violet-700 hover:bg-violet-50">Edit details</button>

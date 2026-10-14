@@ -124,6 +124,10 @@ html.dark .page-fade-in {
   background: #0f172a;
 }
 
+html.dark .site-brand {
+  color: #ffffff !important;
+}
+
 html.dark .bg-slate-100 {
   background-color: #0f172a;
 }

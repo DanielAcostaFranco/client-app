@@ -34,11 +34,11 @@ export default async function SiteHeader() {
 
   return (
     <>
-      <header className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
         <Link
           href={user ? "/dashboard" : "/"}
-          className="flex min-w-0 items-center gap-2 text-2xl font-bold text-blue-700 dark:text-white"
+          className="site-brand flex min-w-0 items-center gap-2 text-2xl font-bold text-blue-700 dark:text-white"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
